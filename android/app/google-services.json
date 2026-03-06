@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "21331862028",
+    "project_id": "event-frame-project",
+    "storage_bucket": "event-frame-project.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:21331862028:android:96033f0f5e357697d18429",
+        "android_client_info": {
+          "package_name": "com.eventframe.event_frame"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "21331862028-g8itj68ee8lcmm9ann3bolsgt1e761dd.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-yxQQaY_2VWA_9raBCD-GxbrWI8Mc6yU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "21331862028-g8itj68ee8lcmm9ann3bolsgt1e761dd.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:21331862028:android:a2ae4a616a70e9ecd18429",
+        "android_client_info": {
+          "package_name": "com.kdht.even_frame_project"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "21331862028-g8itj68ee8lcmm9ann3bolsgt1e761dd.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-yxQQaY_2VWA_9raBCD-GxbrWI8Mc6yU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "21331862028-g8itj68ee8lcmm9ann3bolsgt1e761dd.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
