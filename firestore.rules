@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper: get caller's role ──────────────────────────────────────────
+    function role() {
+      let userDoc = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(userDoc) ? get(userDoc).data.role : 'user';
+    }
+
+    function isAdmin() { return role() == 'admin'; }
+    function isPhotographer() { return role() == 'photographer'; }
+    function isUser() { return role() == 'user'; }
+    function isAuth() { return request.auth != null; }
+
+    // ── Admins can read/write everything ──────────────────────────────────
+    match /{document=**} {
+      allow read, write: if isAuth() && isAdmin();
+    }
+
+    // ── User profiles (all roles stored here) ─────────────────────────────
+    match /users/{uid} {
+      allow read, write: if isAuth(); 
+    }
+
+    // ── Events ────────────────────────────────────────────────────────────
+    match /events/{eventId} {
+      allow read, write: if isAuth();
+    }
+
+    // ── Client profiles ───────────────────────────────────────────────────
+    match /clients/{uid} {
+      allow read, write: if isAuth() && request.auth.uid == uid;
+      // Photographers can add eventAccess to client profiles
+      allow update: if isAuth() && isPhotographer() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['eventAccess']);
+    }
+
+    // ── Membership plans (read-only for all authenticated) ─────────────────
+    match /memberships/{planId} {
+      allow read: if isAuth();
+    }
+
+    // ── Photo orders (client purchases) ──────────────────────────────────
+    match /orders/{orderId} {
+      allow read: if isAuth() &&
+        (resource.data.clientUid == request.auth.uid || isAdmin());
+      allow create: if isAuth() && isUser();
+    }
+
+    // ── Pending deliveries (Drive full fallback) ───────────────────────────
+    match /pendingDeliveries/{deliveryId} {
+      allow read: if isAuth() &&
+        (resource.data.clientUid == request.auth.uid || isAdmin() || isPhotographer());
+    }
+
+    // ── Photos Metadata ───────────────────────────────────────────────────
+    match /photos/{photoId} {
+      allow read, write: if isAuth();
+    }
+  }
+}
