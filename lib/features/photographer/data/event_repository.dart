@@ -1,63 +1,62 @@
 import 'package:flutter/foundation.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../../app/providers/auth_provider.dart';
 import '../domain/event.dart';
 
+final _supabase = Supabase.instance.client;
+
 final eventRepositoryProvider = Provider<EventRepository>((ref) {
-  return EventRepository(FirebaseFirestore.instance);
+  return EventRepository();
 });
 
-final photographerEventsProvider = StreamProvider<List<Event>>((ref) {
+/// FutureProvider that fetches events — call ref.invalidate() to refresh.
+final photographerEventsProvider = FutureProvider<List<Event>>((ref) async {
   final user = ref.watch(authStateProvider).valueOrNull;
-  if (user == null) return Stream.value([]);
+  if (user == null) return [];
 
-  return ref.watch(eventRepositoryProvider).getEventsByPhotographer(user.uid);
+  return ref.watch(eventRepositoryProvider).getEventsByPhotographer(user.id);
 });
 
 class EventRepository {
-  final FirebaseFirestore _firestore;
-
-  EventRepository(this._firestore);
-
-  Stream<List<Event>> getEventsByPhotographer(String photographerUid) {
+  Future<List<Event>> getEventsByPhotographer(String photographerUid) async {
     debugPrint('DEBUG: Fetching events for photographer UID: $photographerUid');
-    return _firestore
-        .collection('events')
-        .where('photographerUid', isEqualTo: photographerUid)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => Event.fromMap(doc.id, doc.data()))
-          .toList();
-    });
+    final rows = await _supabase
+        .from('events')
+        .select()
+        .eq('photographer_uid', photographerUid)
+        .order('created_at', ascending: false);
+
+    return rows.map((row) => Event.fromMap(row['id'], row)).toList();
   }
 
   Future<void> createEvent(Event event) async {
-    await _firestore.collection('events').add(event.toMap());
+    await _supabase.from('events').insert(event.toMap());
   }
 
   Future<Event?> getEventByCode(String code) async {
-    final snapshot = await _firestore
-        .collection('events')
-        .where('code', isEqualTo: code.toUpperCase())
+    final response = await _supabase
+        .from('events')
+        .select()
+        .eq('code', code.toUpperCase())
         .limit(1)
-        .get();
+        .maybeSingle();
 
-    if (snapshot.docs.isEmpty) return null;
-    return Event.fromMap(snapshot.docs.first.id, snapshot.docs.first.data());
+    if (response == null) return null;
+    return Event.fromMap(response['id'], response);
   }
 
-  Stream<Event?> getEventById(String eventId) {
-    return _firestore
-        .collection('events')
-        .doc(eventId)
-        .snapshots()
-        .map((doc) => doc.exists ? Event.fromMap(doc.id, doc.data()!) : null);
+  Future<Event?> getEventById(String eventId) async {
+    final response =
+        await _supabase.from('events').select().eq('id', eventId).maybeSingle();
+
+    if (response == null) return null;
+    return Event.fromMap(response['id'], response);
   }
 }
 
-final eventProvider = StreamProvider.family<Event?, String>((ref, eventId) {
+final eventProvider =
+    FutureProvider.family<Event?, String>((ref, eventId) async {
   return ref.watch(eventRepositoryProvider).getEventById(eventId);
 });

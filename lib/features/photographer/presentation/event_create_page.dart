@@ -60,16 +60,18 @@ class _EventCreatePageState extends ConsumerState<EventCreatePage> {
 
     try {
       final event = Event(
-        id: '', // Firestore will assign this
+        id: '', // Supabase will auto-assign UUID
         name: _nameController.text.trim(),
         code: _codeController.text.trim().toUpperCase(),
         date: _selectedDate,
-        photographerUid: user.uid,
+        photographerUid: user.id,
         watermarkEnabled: _watermarkEnabled,
         createdAt: DateTime.now(),
       );
 
       await ref.read(eventRepositoryProvider).createEvent(event);
+      // Refresh the event list
+      ref.invalidate(photographerEventsProvider);
       if (mounted) {
         context.pop();
         ScaffoldMessenger.of(context).showSnackBar(

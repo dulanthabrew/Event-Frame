@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class Event {
   final String id;
   final String name;
@@ -27,12 +25,12 @@ class Event {
     return {
       'name': name,
       'code': code.toUpperCase(),
-      'date': Timestamp.fromDate(date),
-      'photographerUid': photographerUid,
-      'watermarkEnabled': watermarkEnabled,
-      'photoCount': photoCount,
-      'clientCount': clientCount,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'date': date.toIso8601String(),
+      'photographer_uid': photographerUid,
+      'watermark_enabled': watermarkEnabled,
+      'photo_count': photoCount,
+      'client_count': clientCount,
+      'created_at': createdAt.toIso8601String(),
     };
   }
 
@@ -41,12 +39,12 @@ class Event {
       id: id,
       name: map['name'] ?? '',
       code: map['code'] ?? '',
-      date: (map['date'] as Timestamp).toDate(),
-      photographerUid: map['photographerUid'] ?? '',
-      watermarkEnabled: map['watermarkEnabled'] ?? true,
-      photoCount: map['photoCount'] ?? 0,
-      clientCount: map['clientCount'] ?? 0,
-      createdAt: (map['createdAt'] as Timestamp).toDate(),
+      date: DateTime.parse(map['date']),
+      photographerUid: map['photographer_uid'] ?? '',
+      watermarkEnabled: map['watermark_enabled'] ?? true,
+      photoCount: map['photo_count'] ?? 0,
+      clientCount: map['client_count'] ?? 0,
+      createdAt: DateTime.parse(map['created_at']),
     );
   }
 }

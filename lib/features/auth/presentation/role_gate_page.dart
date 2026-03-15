@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/providers/auth_provider.dart';
 import '../domain/app_user.dart';
 
-/// After login, reads the user's role from Firestore and redirects to
+/// After login, reads the user's role from the database and redirects to
 /// the appropriate portal without showing any UI.
 class RoleGatePage extends ConsumerWidget {
   const RoleGatePage({super.key});
