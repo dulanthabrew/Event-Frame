@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'google_sign_in_provider.dart';
 
 import '../../features/auth/domain/app_user.dart';
 
@@ -10,7 +11,17 @@ final _supabase = Supabase.instance.client;
 
 // ── Raw Supabase auth state stream ──────────────────────────────────────────
 final authStateProvider = StreamProvider<User?>((ref) {
-  return _supabase.auth.onAuthStateChange.map((event) => event.session?.user);
+  return _supabase.auth.onAuthStateChange.map((event) {
+    return event.session?.user;
+  }).handleError((e) {
+    // Ignore 'Code verifier' errors on Web - they are often noise during session recovery
+    if (e.toString().contains('Code verifier')) {
+      debugPrint('DEBUG: Ignoring auth verifier warning: $e');
+      return _supabase.auth.currentUser;
+    }
+    debugPrint('DEBUG: authStateProvider Error: $e');
+    return null;
+  });
 });
 
 // ── Resolved AppUser (with profile role from DB) ────────────────────────────
@@ -50,17 +61,7 @@ final authRepositoryProvider = Provider<AuthRepository>(
 );
 
 class AuthRepository {
-  final _googleSignIn = GoogleSignIn(
-    clientId: kIsWeb
-        ? '21331862028-g8itj68ee8lcmm9ann3bolsgt1e761dd.apps.googleusercontent.com'
-        : null,
-    scopes: [
-      'email',
-      'profile',
-      'https://www.googleapis.com/auth/drive.file',
-      'https://www.googleapis.com/auth/drive.appdata',
-    ],
-  );
+  final GoogleSignIn _googleSignIn = appGoogleSignIn;
 
   /// Google Sign-In → Supabase Auth
   Future<AppUser?> signInWithGoogle() async {

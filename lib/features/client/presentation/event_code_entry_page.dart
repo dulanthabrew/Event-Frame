@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_theme.dart';
+import '../../../app/providers/auth_provider.dart';
+import '../data/client_repository.dart';
 import '../../photographer/data/event_repository.dart';
 
 class EventCodeEntryPage extends ConsumerStatefulWidget {
@@ -43,6 +45,16 @@ class _EventCodeEntryPageState extends ConsumerState<EventCodeEntryPage> {
 
       if (mounted) {
         if (event != null) {
+          // Save access to DB for later switching
+          final user = ref.read(authStateProvider).valueOrNull;
+          if (user != null) {
+            await ref
+                .read(clientRepositoryProvider)
+                .addEventAccess(user.id, event.id);
+            // Invalidate the provider so the Switcher UI updates
+            ref.invalidate(clientEventsProvider);
+          }
+
           context.go('/gallery/${event.id}');
         } else {
           ScaffoldMessenger.of(context).showSnackBar(

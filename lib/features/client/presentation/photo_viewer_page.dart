@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../app/services/google_drive_service.dart';
+import '../../photographer/data/event_repository.dart';
 import '../../photographer/data/photo_repository.dart';
 
 class PhotoViewerPage extends ConsumerWidget {
@@ -26,17 +29,35 @@ class PhotoViewerPage extends ConsumerWidget {
         elevation: 0,
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.download_rounded),
-            onPressed: () {
-              // TODO: Download high-res photo from Drive/Storage
+          // Download button
+          photosAsync.when(
+            data: (photos) {
+              final photo = photos.where((p) => p.id == photoId).firstOrNull;
+              if (photo == null) return const SizedBox();
+              return IconButton(
+                icon: const Icon(Icons.download_rounded),
+                tooltip: 'Download Photo',
+                onPressed: () => _downloadPhoto(context, photo.url),
+              );
             },
+            loading: () => const SizedBox(),
+            error: (_, __) => const SizedBox(),
           ),
-          IconButton(
-            icon: const Icon(Icons.favorite_border_rounded),
-            onPressed: () {
-              // TODO: Mark as favorite
+
+          // Save to Drive button
+          photosAsync.when(
+            data: (photos) {
+              final photo = photos.where((p) => p.id == photoId).firstOrNull;
+              if (photo == null) return const SizedBox();
+              return IconButton(
+                icon: const Icon(Icons.add_to_drive_rounded),
+                tooltip: 'Save to Google Drive',
+                onPressed: () =>
+                    _saveToDrive(context, ref, photo.url, photo.fileName),
+              );
             },
+            loading: () => const SizedBox(),
+            error: (_, __) => const SizedBox(),
           ),
           const SizedBox(width: 8),
         ],
@@ -127,5 +148,57 @@ class PhotoViewerPage extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// Download photo — opens the URL in a new tab (web) or launches browser (mobile).
+  void _downloadPhoto(BuildContext context, String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open download link')),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Download error: $e')),
+        );
+      }
+    }
+  }
+
+  /// Save a single photo to Google Drive.
+  void _saveToDrive(
+      BuildContext context, WidgetRef ref, String url, String fileName) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Saving to Google Drive...')),
+    );
+
+    final eventAsync = ref.read(eventProvider(eventId));
+    final eventName = eventAsync.valueOrNull?.name ?? 'EventFrame';
+
+    final success = await GoogleDriveService.uploadPhotoToDrive(
+      eventName: eventName,
+      photoUrl: url,
+      fileName: fileName,
+    );
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success
+                ? '✅ Photo saved to Google Drive → EventFrame/$eventName/'
+                : '❌ Failed to save to Drive',
+          ),
+        ),
+      );
+    }
   }
 }
