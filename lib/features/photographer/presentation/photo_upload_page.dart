@@ -1,8 +1,10 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shimmer/shimmer.dart';
 
 import '../../../app/theme/app_theme.dart';
 import '../data/photo_repository.dart';
@@ -48,6 +50,9 @@ class _PhotoUploadPageState extends ConsumerState<PhotoUploadPage> {
       );
 
       if (mounted) {
+        // Refresh the photo list and event data
+        ref.invalidate(eventPhotosProvider(widget.eventId));
+
         setState(() {
           _isUploading = false;
           _selectedFiles.clear();
@@ -289,11 +294,30 @@ class _PhotoUploadPageState extends ConsumerState<PhotoUploadPage> {
                       final photo = photos[index];
                       return ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: Image.network(
-                          photo.url,
+                        child: CachedNetworkImage(
+                          imageUrl: photo.thumbnailUrl ?? photo.url,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              Container(color: AppTheme.cardDark),
+                          width: double.infinity,
+                          height: double.infinity,
+                          memCacheWidth: 400,
+                          memCacheHeight: 400,
+                          placeholder: (context, url) => Shimmer.fromColors(
+                            baseColor: AppTheme.cardDark,
+                            highlightColor: AppTheme.primary.withOpacity(0.1),
+                            child: Container(
+                              color: AppTheme.cardDark,
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            color: AppTheme.cardDark,
+                            child: const Center(
+                              child: Icon(
+                                Icons.broken_image_outlined,
+                                color: Colors.grey,
+                                size: 32,
+                              ),
+                            ),
+                          ),
                         ),
                       );
                     },

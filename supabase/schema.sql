@@ -45,7 +45,7 @@ CREATE INDEX idx_photos_event ON photos(event_id);
 -- ── Clients (event access tracking) ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS clients (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL UNIQUE REFERENCES profiles(id) ON DELETE CASCADE,
   event_access UUID[] DEFAULT '{}'
 );
 

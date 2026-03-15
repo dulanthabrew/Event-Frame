@@ -38,6 +38,7 @@ class PhotoRepository {
       final fileSize = bytes.length;
 
       String url;
+      String thumbnailUrl;
       try {
         await _supabase.storage.from('photos').uploadBinary(
               storagePath,
@@ -48,16 +49,19 @@ class PhotoRepository {
               ),
             );
         url = _supabase.storage.from('photos').getPublicUrl(storagePath);
+        // Use same URL — client CachedNetworkImage handles display sizing
+        thumbnailUrl = url;
       } catch (e) {
         debugPrint('DEBUG: Storage upload error: $e');
-        // Fallback: use placeholder image if storage fails
         url = 'https://picsum.photos/seed/$photoId/1200/800';
+        thumbnailUrl = 'https://picsum.photos/seed/$photoId/400/400';
       }
 
       final photo = Photo(
         id: photoId,
         eventId: eventId,
         url: url,
+        thumbnailUrl: thumbnailUrl,
         uploadedAt: DateTime.now(),
         fileName: file.name,
         size: fileSize,
