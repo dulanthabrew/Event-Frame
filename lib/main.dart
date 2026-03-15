@@ -1,18 +1,19 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'app/config/supabase_config.dart';
 import 'app/router/app_router.dart';
+import 'app/services/revenue_cat_service.dart';
 import 'app/theme/app_theme.dart';
-import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // NOTE: This will fail until firebase_options.dart is populated via flutterfire configure
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // Initialize Supabase
+  await SupabaseConfig.initialize();
+
+  // Initialize RevenueCat (mobile only)
+  await RevenueCatService.initialize();
 
   runApp(
     const ProviderScope(

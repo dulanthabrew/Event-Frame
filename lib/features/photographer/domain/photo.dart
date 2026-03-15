@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class Photo {
   final String id;
   final String eventId;
@@ -21,11 +19,11 @@ class Photo {
 
   Map<String, dynamic> toMap() {
     return {
-      'eventId': eventId,
+      'event_id': eventId,
       'url': url,
-      'thumbnailUrl': thumbnailUrl,
-      'uploadedAt': uploadedAt.toIso8601String(),
-      'fileName': fileName,
+      'thumbnail_url': thumbnailUrl,
+      'uploaded_at': uploadedAt.toIso8601String(),
+      'file_name': fileName,
       'size': size,
     };
   }
@@ -33,18 +31,14 @@ class Photo {
   factory Photo.fromMap(String id, Map<String, dynamic> map) {
     return Photo(
       id: id,
-      eventId: map['eventId'] ?? '',
+      eventId: map['event_id'] ?? '',
       url: map['url'] ?? '',
-      thumbnailUrl: map['thumbnailUrl'],
-      uploadedAt: map['uploadedAt'] != null
-          ? DateTime.parse(map['uploadedAt'])
+      thumbnailUrl: map['thumbnail_url'],
+      uploadedAt: map['uploaded_at'] != null
+          ? DateTime.parse(map['uploaded_at'])
           : DateTime.now(),
-      fileName: map['fileName'] ?? '',
+      fileName: map['file_name'] ?? '',
       size: map['size'] ?? 0,
     );
-  }
-
-  factory Photo.fromFirestore(DocumentSnapshot doc) {
-    return Photo.fromMap(doc.id, doc.data() as Map<String, dynamic>);
   }
 }

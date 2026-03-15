@@ -44,10 +44,11 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Firebase / Secrets
+# Secrets & Config
 **/google-services.json
 **/GoogleService-Info.plist
 lib/firebase_options.dart
+lib/app/config/supabase_config.dart
 .env*
 *.jks
 *.keystore

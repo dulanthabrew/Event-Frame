@@ -21,23 +21,23 @@ class AppUser {
     return AppUser(
       uid: uid,
       email: map['email'] as String,
-      displayName: map['displayName'] as String,
+      displayName: map['display_name'] as String,
       role: UserRole.values.firstWhere(
         (r) => r.name == (map['role'] as String),
         orElse: () => UserRole.user,
       ),
-      photoUrl: map['photoUrl'] as String?,
-      createdAt: DateTime.parse(map['createdAt'] as String),
+      photoUrl: map['photo_url'] as String?,
+      createdAt: DateTime.parse(map['created_at'] as String),
     );
   }
 
   Map<String, dynamic> toMap() => {
-    'email': email,
-    'displayName': displayName,
-    'role': role.name,
-    'photoUrl': photoUrl,
-    'createdAt': createdAt.toIso8601String(),
-  };
+        'email': email,
+        'display_name': displayName,
+        'role': role.name,
+        'photo_url': photoUrl,
+        'created_at': createdAt.toIso8601String(),
+      };
 
   bool get isAdmin => role == UserRole.admin;
   bool get isPhotographer => role == UserRole.photographer;

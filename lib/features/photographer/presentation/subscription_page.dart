@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 
+import '../../../app/providers/subscription_provider.dart';
+import '../../../app/services/revenue_cat_service.dart';
 import '../../../app/theme/app_theme.dart';
 
 class SubscriptionPage extends ConsumerWidget {
@@ -9,6 +12,9 @@ class SubscriptionPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final customerInfoAsync = ref.watch(customerInfoProvider);
+    final offeringsAsync = ref.watch(offeringsProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Subscription Settings'),
@@ -18,7 +24,7 @@ class SubscriptionPage extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Current Plan Section
+            // ── Current Plan Section ──────────────────────────────────────
             Text(
               'Current Plan',
               style: GoogleFonts.inter(
@@ -27,52 +33,110 @@ class SubscriptionPage extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 16),
-            _CurrentPlanCard(
-              name: 'Pro Tier',
-              renewalDate: 'April 20, 2026',
-              price: '\$49/mo',
-              status: 'Active',
+
+            customerInfoAsync.when(
+              data: (info) {
+                if (info == null || info.entitlements.active.isEmpty) {
+                  return _CurrentPlanCard(
+                    name: 'Free',
+                    renewalDate: 'N/A',
+                    price: '\$0',
+                    status: 'No Active Plan',
+                  );
+                }
+                final activeEntitlement = info.entitlements.active.values.first;
+                return _CurrentPlanCard(
+                  name: activeEntitlement.productIdentifier,
+                  renewalDate: activeEntitlement.expirationDate ?? 'Lifetime',
+                  price: 'Active',
+                  status: activeEntitlement.isActive ? 'Active' : 'Expired',
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => _CurrentPlanCard(
+                name: 'Free',
+                renewalDate: 'N/A',
+                price: '\$0',
+                status: 'Error loading',
+              ),
             ),
+
             const SizedBox(height: 32),
 
-            // Upgrade Options
+            // ── Available Plans ───────────────────────────────────────────
             Text(
-              'Change Plan',
+              'Available Plans',
               style: GoogleFonts.inter(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 16),
-            _PlanSelectionTile(
-              name: 'Basic',
-              price: '\$19/mo',
-              features: '25 events, 500 photos/event',
-              isSelected: false,
-            ),
-            const SizedBox(height: 12),
-            _PlanSelectionTile(
-              name: 'Enterprise',
-              price: 'Custom',
-              features: 'White-labeling, Custom Domain, Multi-user',
-              isSelected: false,
+
+            offeringsAsync.when(
+              data: (offerings) {
+                if (offerings == null ||
+                    offerings.current == null ||
+                    offerings.current!.availablePackages.isEmpty) {
+                  return Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Center(
+                        child: Text(
+                          'No subscription plans available.\nPlease configure offerings in RevenueCat.',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.5),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: offerings.current!.availablePackages
+                      .map((package) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _PackageTile(package: package),
+                          ))
+                      .toList(),
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Text('Error loading plans: $e'),
             ),
 
-            const SizedBox(height: 48),
+            const SizedBox(height: 24),
 
-            // Billing History (Mock)
-            Text(
-              'Billing History',
-              style: GoogleFonts.inter(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
+            // ── Restore Purchases ────────────────────────────────────────
+            Center(
+              child: TextButton.icon(
+                onPressed: () async {
+                  try {
+                    await RevenueCatService.restorePurchases();
+                    ref.invalidate(customerInfoProvider);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Purchases restored successfully!')),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Restore failed: $e')),
+                      );
+                    }
+                  }
+                },
+                icon: const Icon(Icons.restore),
+                label: const Text('Restore Purchases'),
               ),
             ),
-            const SizedBox(height: 16),
-            _BillingHistoryItem(
-                date: 'Mar 20, 2026', amount: '\$49.00', status: 'Paid'),
-            _BillingHistoryItem(
-                date: 'Feb 20, 2026', amount: '\$49.00', status: 'Paid'),
           ],
         ),
       ),
@@ -80,6 +144,7 @@ class SubscriptionPage extends ConsumerWidget {
   }
 }
 
+// ── Current Plan Card ──────────────────────────────────────────────────────
 class _CurrentPlanCard extends StatelessWidget {
   final String name;
   final String renewalDate;
@@ -104,25 +169,27 @@ class _CurrentPlanCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: GoogleFonts.inter(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
-                    Text(
-                      'Next renewal: $renewalDate',
-                      style: GoogleFonts.inter(
-                        color: Colors.white.withOpacity(0.8),
-                        fontSize: 12,
+                      Text(
+                        'Renewal: $renewalDate',
+                        style: GoogleFonts.inter(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 12,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 Container(
                   padding:
@@ -142,27 +209,14 @@ class _CurrentPlanCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  price,
-                  style: GoogleFonts.inter(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () {},
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: AppTheme.primary,
-                  ),
-                  child: const Text('Manage Billing'),
-                ),
-              ],
+            const SizedBox(height: 16),
+            Text(
+              price,
+              style: GoogleFonts.inter(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ],
         ),
@@ -171,21 +225,16 @@ class _CurrentPlanCard extends StatelessWidget {
   }
 }
 
-class _PlanSelectionTile extends StatelessWidget {
-  final String name;
-  final String price;
-  final String features;
-  final bool isSelected;
+// ── Package / Plan Tile ────────────────────────────────────────────────────
+class _PackageTile extends ConsumerWidget {
+  final Package package;
 
-  const _PlanSelectionTile({
-    required this.name,
-    required this.price,
-    required this.features,
-    required this.isSelected,
-  });
+  const _PackageTile({required this.package});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final product = package.storeProduct;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -206,76 +255,64 @@ class _PlanSelectionTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    name,
+                    product.title,
                     style: GoogleFonts.inter(fontWeight: FontWeight.w700),
                   ),
-                  Text(
-                    features,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withOpacity(0.5),
+                  if (product.description.isNotEmpty)
+                    Text(
+                      product.description,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.5),
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
                 ],
               ),
             ),
-            Text(
-              price,
-              style: GoogleFonts.inter(fontWeight: FontWeight.w800),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  product.priceString,
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+                ElevatedButton(
+                  onPressed: () => _purchase(context, ref),
+                  style: ElevatedButton.styleFrom(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                  child: const Text('Subscribe'),
+                ),
+              ],
             ),
           ],
         ),
       ),
     );
   }
-}
 
-class _BillingHistoryItem extends StatelessWidget {
-  final String date;
-  final String amount;
-  final String status;
-
-  const _BillingHistoryItem({
-    required this.date,
-    required this.amount,
-    required this.status,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(date, style: GoogleFonts.inter(fontSize: 14)),
-          Row(
-            children: [
-              Text(amount,
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppTheme.success.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  status,
-                  style: GoogleFonts.inter(
-                    color: AppTheme.success,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+  Future<void> _purchase(BuildContext context, WidgetRef ref) async {
+    try {
+      await RevenueCatService.purchasePackage(package);
+      ref.invalidate(customerInfoProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Subscription activated!')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Purchase failed: $e')),
+        );
+      }
+    }
   }
 }

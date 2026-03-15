@@ -1,39 +1,36 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../auth/domain/app_user.dart';
 
+final _supabase = Supabase.instance.client;
+
 class UserRepository {
-  final FirebaseFirestore _firestore;
+  Future<List<AppUser>> getAllUsers() async {
+    final rows = await _supabase
+        .from('profiles')
+        .select()
+        .order('created_at', ascending: false);
 
-  UserRepository(this._firestore);
-
-  Stream<List<AppUser>> getAllUsers() {
-    return _firestore
-        .collection('users')
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => AppUser.fromMap(doc.id, doc.data()))
-            .toList());
+    return rows.map((row) => AppUser.fromMap(row['id'], row)).toList();
   }
 
   Future<void> updateUserRole(String uid, UserRole role) async {
-    await _firestore.collection('users').doc(uid).update({
+    await _supabase.from('profiles').update({
       'role': role.name,
-    });
+    }).eq('id', uid);
   }
 
   Future<void> deleteUser(String uid) async {
-    // Note: This only deletes the Firestore doc.
-    // Real deletion would require Admin SDK for Firebase Auth.
-    await _firestore.collection('users').doc(uid).delete();
+    // Delete the profile row (auth.users deletion requires service role / admin API)
+    await _supabase.from('profiles').delete().eq('id', uid);
   }
 }
 
 final userRepositoryProvider = Provider<UserRepository>((ref) {
-  return UserRepository(FirebaseFirestore.instance);
+  return UserRepository();
 });
 
-final allUsersProvider = StreamProvider<List<AppUser>>((ref) {
+final allUsersProvider = FutureProvider<List<AppUser>>((ref) async {
   return ref.watch(userRepositoryProvider).getAllUsers();
 });

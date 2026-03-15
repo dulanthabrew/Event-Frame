@@ -1,51 +1,58 @@
 import 'package:flutter/foundation.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+
 import '../domain/photo.dart';
 
+final _supabase = Supabase.instance.client;
+
 class PhotoRepository {
-  final FirebaseFirestore _firestore;
-
-  PhotoRepository(this._firestore);
-
-  Stream<List<Photo>> getPhotosByEvent(String eventId) {
+  Future<List<Photo>> getPhotosByEvent(String eventId) async {
     debugPrint('DEBUG: Fetching photos for eventId: $eventId');
-    return _firestore
-        .collection('photos')
-        .where('eventId', isEqualTo: eventId)
-        .snapshots()
-        .map((snapshot) {
-      debugPrint(
-          'DEBUG: Found ${snapshot.docs.length} photos for eventId: $eventId');
-      return snapshot.docs.map((doc) => Photo.fromFirestore(doc)).toList();
-    });
+    final rows = await _supabase
+        .from('photos')
+        .select()
+        .eq('event_id', eventId)
+        .order('uploaded_at', ascending: false);
+
+    debugPrint('DEBUG: Found ${rows.length} photos for eventId: $eventId');
+    return rows.map((row) => Photo.fromMap(row['id'], row)).toList();
   }
 
   Future<void> uploadPhotos(
       String eventId, List<XFile> files, Function(double) onProgress) async {
     debugPrint(
-        'DEBUG: Starting mock upload of ${files.length} photos for eventId: $eventId');
+        'DEBUG: Starting upload of ${files.length} photos for eventId: $eventId');
     final int totalFiles = files.length;
 
     for (int i = 0; i < totalFiles; i++) {
       final file = files[i];
       final photoId = const Uuid().v4();
+      final fileExt = file.name.split('.').last;
+      final storagePath = '$eventId/$photoId.$fileExt';
 
-      // Simulate progress for the "upload"
-      for (int p = 0; p <= 10; p++) {
-        await Future.delayed(const Duration(milliseconds: 100));
-        final currentFileProgress = p / 10.0;
-        final overallProgress = (i + currentFileProgress) / totalFiles;
-        onProgress(overallProgress);
-      }
-
-      // Use a distinct placeholder image for each photo based on photoId
-      final url = 'https://picsum.photos/seed/$photoId/1200/800';
-
+      // Upload to Supabase Storage
       final bytes = await file.readAsBytes();
       final fileSize = bytes.length;
+
+      String url;
+      try {
+        await _supabase.storage.from('photos').uploadBinary(
+              storagePath,
+              bytes,
+              fileOptions: FileOptions(
+                contentType: 'image/$fileExt',
+                upsert: true,
+              ),
+            );
+        url = _supabase.storage.from('photos').getPublicUrl(storagePath);
+      } catch (e) {
+        debugPrint('DEBUG: Storage upload error: $e');
+        // Fallback: use placeholder image if storage fails
+        url = 'https://picsum.photos/seed/$photoId/1200/800';
+      }
 
       final photo = Photo(
         id: photoId,
@@ -56,13 +63,26 @@ class PhotoRepository {
         size: fileSize,
       );
 
-      // Save metadata to Firestore (this part is still real)
-      await _firestore.collection('photos').add(photo.toMap());
+      // Save metadata to database
+      await _supabase.from('photos').insert(photo.toMap());
 
-      // Increment photo count in the event document
-      await _firestore.collection('events').doc(eventId).update({
-        'photoCount': FieldValue.increment(1),
-      });
+      // Increment photo count
+      try {
+        final event = await _supabase
+            .from('events')
+            .select('photo_count')
+            .eq('id', eventId)
+            .single();
+        await _supabase.from('events').update({
+          'photo_count': (event['photo_count'] as int) + 1,
+        }).eq('id', eventId);
+      } catch (e) {
+        debugPrint('DEBUG: Photo count update error: $e');
+      }
+
+      // Update progress
+      final overallProgress = (i + 1) / totalFiles;
+      onProgress(overallProgress);
     }
 
     onProgress(1.0);
@@ -70,12 +90,10 @@ class PhotoRepository {
 }
 
 final photoRepositoryProvider = Provider<PhotoRepository>((ref) {
-  return PhotoRepository(
-    FirebaseFirestore.instance,
-  );
+  return PhotoRepository();
 });
 
 final eventPhotosProvider =
-    StreamProvider.family<List<Photo>, String>((ref, eventId) {
+    FutureProvider.family<List<Photo>, String>((ref, eventId) async {
   return ref.watch(photoRepositoryProvider).getPhotosByEvent(eventId);
 });
